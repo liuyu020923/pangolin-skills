@@ -15,7 +15,7 @@ Legacy usage (URL-based):
     pangolin.py --url "https://amazon.com/dp/..." --mode amazon
 
 Environment:
-    PANGOLIN_TOKEN    - API key (skips login)
+    PANGOLIN_API_KEY  - API key (skips login)
     PANGOLIN_EMAIL    - Account email (for login)
     PANGOLIN_PASSWORD - Account password (for login)
 """
@@ -51,7 +51,7 @@ API_BASE = "https://scrapeapi.pangolinfo.com"
 AUTH_ENDPOINT = f"{API_BASE}/api/v1/auth"
 SCRAPE_V1_ENDPOINT = f"{API_BASE}/api/v1/scrape"
 FOLLOW_SELLER_ENDPOINT = f"{API_BASE}/api/v1/scrape/follow-seller"
-TOKEN_CACHE_PATH = Path.home() / ".pangolin_token"
+API_KEY_CACHE_PATH = Path.home() / ".pangolin_api_key"
 
 EXIT_SUCCESS = 0
 EXIT_API_ERROR = 1
@@ -121,22 +121,22 @@ def _error_exit(code, message, hint=None, exit_code=EXIT_API_ERROR):
 
 
 # ---------------------------------------------------------------------------
-# Token management
+# API key management
 # ---------------------------------------------------------------------------
-def load_cached_token():
-    """Load token from cache file if it exists."""
-    if TOKEN_CACHE_PATH.exists():
-        token = TOKEN_CACHE_PATH.read_text().strip()
-        if token and len(token.split(".")) == 3:  # Basic JWT format check
-            return token
+def load_cached_api_key():
+    """Load API key from cache file if it exists."""
+    if API_KEY_CACHE_PATH.exists():
+        api_key = API_KEY_CACHE_PATH.read_text().strip()
+        if api_key and len(api_key.split(".")) == 3:  # Basic JWT format check
+            return api_key
     return None
 
 
-def save_cached_token(token):
-    """Save token to cache file."""
-    TOKEN_CACHE_PATH.write_text(token)
+def save_cached_api_key(api_key):
+    """Save API key to cache file."""
+    API_KEY_CACHE_PATH.write_text(api_key)
     try:
-        TOKEN_CACHE_PATH.chmod(0o600)
+        API_KEY_CACHE_PATH.chmod(0o600)
     except OSError:
         pass
     # Windows: restrict file access to current user
@@ -144,7 +144,7 @@ def save_cached_token(token):
         try:
             import subprocess
             subprocess.run(
-                ["icacls", str(TOKEN_CACHE_PATH), "/inheritance:r",
+                ["icacls", str(API_KEY_CACHE_PATH), "/inheritance:r",
                  "/grant:r", f"{os.environ.get('USERNAME', '')}:F"],
                 capture_output=True, check=False,
             )
@@ -153,7 +153,7 @@ def save_cached_token(token):
 
 
 def authenticate(email, password):
-    """Authenticate with Pangolin API and return a bearer token."""
+    """Authenticate with Pangolin API and return an API key."""
     body = json.dumps({"email": email, "password": password}).encode()
     req = urllib.request.Request(
         AUTH_ENDPOINT,
@@ -192,21 +192,21 @@ def authenticate(email, password):
             exit_code=EXIT_AUTH_ERROR,
         )
 
-    token = result["data"]
-    save_cached_token(token)
-    return token
+    api_key = result["data"]
+    save_cached_api_key(api_key)
+    return api_key
 
 
-def get_token():
-    """Resolve token from env var, cache file, or fresh login."""
-    token = os.environ.get("PANGOLIN_TOKEN")
-    if token:
-        save_cached_token(token)  # Cache for future calls without env var
-        return token
+def get_api_key():
+    """Resolve API key from env var, cache file, or fresh login."""
+    api_key = os.environ.get("PANGOLIN_API_KEY")
+    if api_key:
+        save_cached_api_key(api_key)  # Cache for future calls without env var
+        return api_key
 
-    token = load_cached_token()
-    if token:
-        return token
+    api_key = load_cached_api_key()
+    if api_key:
+        return api_key
 
     email = os.environ.get("PANGOLIN_EMAIL")
     password = os.environ.get("PANGOLIN_PASSWORD")
@@ -215,7 +215,7 @@ def get_token():
             "MISSING_ENV",
             "No authentication credentials found.",
             hint=(
-                "Set PANGOLIN_TOKEN, or both PANGOLIN_EMAIL and PANGOLIN_PASSWORD "
+                "Set PANGOLIN_API_KEY, or both PANGOLIN_EMAIL and PANGOLIN_PASSWORD "
                 "environment variables."
             ),
             exit_code=EXIT_AUTH_ERROR,
@@ -224,7 +224,7 @@ def get_token():
     return authenticate(email, password)
 
 
-def refresh_token():
+def refresh_api_key():
     """Force re-authentication using email/password."""
     email = os.environ.get("PANGOLIN_EMAIL")
     password = os.environ.get("PANGOLIN_PASSWORD")
@@ -374,11 +374,11 @@ def build_amazon_body(url, query, content, site, parser, zipcode, fmt):
 # ---------------------------------------------------------------------------
 # API call with retry
 # ---------------------------------------------------------------------------
-def call_api(token, body, endpoint, max_retries=3, timeout=120):
+def call_api(api_key, body, endpoint, max_retries=3, timeout=120):
     """Call the scrape API with retry and exponential backoff."""
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"Bearer {api_key}",
         "User-Agent": "Pangolin-CLI/1.0",
     }
     payload = json.dumps(body).encode()
@@ -442,11 +442,11 @@ def call_api(token, body, endpoint, max_retries=3, timeout=120):
     return None
 
 
-def handle_response(result, token, body, endpoint, timeout=120):
+def handle_response(result, api_key, body, endpoint, timeout=120):
     """Handle API response, retrying auth on 1004 error."""
     if result.get("code") == 1004:
-        new_token = refresh_token()
-        return call_api(new_token, body, endpoint, timeout=timeout)
+        new_api_key = refresh_api_key()
+        return call_api(new_api_key, body, endpoint, timeout=timeout)
     return result
 
 
@@ -548,7 +548,7 @@ def main():
             "  python3 scripts/pangolin.py --auth-only\n"
             "\n"
             "Environment variables:\n"
-            "  PANGOLIN_TOKEN      API Key (skips login)\n"
+            "  PANGOLIN_API_KEY    API key (skips login)\n"
             "  PANGOLIN_EMAIL      Account email\n"
             "  PANGOLIN_PASSWORD   Account password\n"
             "\n"
@@ -671,7 +671,7 @@ def main():
     if not args.query and not args.target_url and not args.content and not args.auth_only:
         parser.error("--q, --url, or --content is required unless using --auth-only")
 
-    token = get_token()
+    api_key = get_api_key()
 
     if args.auth_only:
         print(
@@ -679,9 +679,9 @@ def main():
                 {
                     "success": True,
                     "message": "Authentication successful",
-                    "token_preview": (
-                        f"{token[:8]}...{token[-4:]}"
-                        if len(token) > 12
+                    "api_key_preview": (
+                        f"{api_key[:8]}...{api_key[-4:]}"
+                        if len(api_key) > 12
                         else "***"
                     ),
                 },
@@ -716,7 +716,7 @@ def main():
             args.fmt,
         )
         endpoint = SCRAPE_V1_ENDPOINT
-    result = call_api(token, body, endpoint, timeout=args.timeout)
+    result = call_api(api_key, body, endpoint, timeout=args.timeout)
 
     if result is None:
         _error_exit(
@@ -726,7 +726,7 @@ def main():
             exit_code=EXIT_NETWORK_ERROR,
         )
 
-    result = handle_response(result, token, body, endpoint, timeout=args.timeout)
+    result = handle_response(result, api_key, body, endpoint, timeout=args.timeout)
 
     if result is None:
         _error_exit(

@@ -4,7 +4,7 @@ description: >
   Search Google and get AI Overviews using Pangolin APIs. Use this skill when
   the user wants to: search Google with AI answers, get search engine results,
   perform multi-turn AI search conversations, or capture search screenshots.
-  Requires PANGOLIN_EMAIL + PANGOLIN_PASSWORD env vars (or PANGOLIN_TOKEN).
+  Requires PANGOLIN_EMAIL + PANGOLIN_PASSWORD env vars (or PANGOLIN_API_KEY).
 ---
 
 # Pangolinfo AI SERP Skill
@@ -41,11 +41,11 @@ Set **one** of the following:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `PANGOLIN_TOKEN` | Option A | API Key (skips login) |
+| `PANGOLIN_API_KEY` | Option A | API Key (skips login) |
 | `PANGOLIN_EMAIL` | Option B | Account email |
 | `PANGOLIN_PASSWORD` | Option B | Account password |
 
-API key resolution order: `PANGOLIN_TOKEN` env var > cached `~/.pangolin_token` > fresh login.
+API key resolution order: `PANGOLIN_API_KEY` env var > cached `~/.pangolin_api_key` > fresh login.
 
 ### macOS SSL Certificate Fix
 
@@ -89,13 +89,13 @@ Tell the user (in their language):
 
 ### Step 3: Collect credentials and authenticate automatically
 
-When the user provides their credentials, **you (the AI agent) should configure them securely**. The script will automatically cache the API key at `~/.pangolin_token` for all future calls.
+When the user provides their credentials, **you (the AI agent) should configure them securely**. The script will automatically cache the API key at `~/.pangolin_api_key` for all future calls.
 
 **If user provides an API key (recommended):**
 Write it directly to the cache file — avoids shell history entirely:
 ```bash
-echo "<token>" > ~/.pangolin_token
-chmod 600 ~/.pangolin_token 2>/dev/null
+echo "<api_key>" > ~/.pangolin_api_key
+chmod 600 ~/.pangolin_api_key 2>/dev/null
 python3 scripts/pangolin.py --auth-only
 ```
 
@@ -110,7 +110,7 @@ unset PANGOLIN_EMAIL PANGOLIN_PASSWORD
 
 This avoids passwords appearing in shell history (unlike inline `VAR=x command` syntax) and cleans up credentials after the API key is cached.
 
-Both methods cache the API key automatically. After this one-time setup, **no environment variables are needed** — all future calls will use the cached API key at `~/.pangolin_token`.
+Both methods cache the API key automatically. After this one-time setup, **no environment variables are needed** — all future calls will use the cached API key at `~/.pangolin_api_key`.
 
 ### Step 4: Confirm and proceed
 
@@ -120,7 +120,7 @@ After auth returns `"success": true`:
 
 ### Important
 
-- **The user only needs to provide credentials ONCE** — the script caches the API key permanently at `~/.pangolin_token`
+- **The user only needs to provide credentials ONCE** — the script caches the API key permanently at `~/.pangolin_api_key`
 - Do not ask the user to manually edit `.bashrc` or `.zshrc` — the script handles persistence automatically
 - If the user doesn't have an account yet, explain Pangolin's credit system (2 credits per AI Mode search, 0.5 credits per SERP search) and direct them to [pangolinfo.com](https://www.pangolinfo.com)
 - If auth succeeds but credits are exhausted (error code `2001`), tell the user to top up at pangolinfo.com
@@ -266,7 +266,7 @@ The script outputs JSON to **stdout** on success and structured error JSON to **
   "error": {
     "code": "MISSING_ENV",
     "message": "No authentication credentials found.",
-    "hint": "Set PANGOLIN_TOKEN, or both PANGOLIN_EMAIL and PANGOLIN_PASSWORD environment variables."
+    "hint": "Set PANGOLIN_API_KEY, or both PANGOLIN_EMAIL and PANGOLIN_PASSWORD environment variables."
   }
 }
 ```
@@ -323,7 +323,7 @@ Credits are only consumed on successful requests (API code 0). Auth checks (`--a
 
 | Error Code | Meaning | User-Facing Message | Resolution |
 |------------|---------|---------------------|------------|
-| `MISSING_ENV` | No credentials | "Authentication credentials are not configured." | Set `PANGOLIN_EMAIL` + `PANGOLIN_PASSWORD` or `PANGOLIN_TOKEN`. |
+| `MISSING_ENV` | No credentials | "Authentication credentials are not configured." | Set `PANGOLIN_EMAIL` + `PANGOLIN_PASSWORD` or `PANGOLIN_API_KEY`. |
 | `AUTH_FAILED` | Wrong credentials | "Authentication failed. Please check your credentials." | Verify email and password are correct. |
 | `RATE_LIMIT` | Too many requests | "The API is rate-limiting requests. Please wait and try again." | Wait a moment, then retry. |
 | `NETWORK` | Connection issue | "A network error occurred. Please check your connection." | Check internet, firewall, proxy settings. |
@@ -334,7 +334,7 @@ Credits are only consumed on successful requests (API code 0). Auth checks (`--a
 
 | API Code | Meaning | Resolution |
 |----------|---------|------------|
-| 1004 | Invalid/expired API key | Auto-retried by the script. If persistent, delete `~/.pangolin_token` and retry. |
+| 1004 | Invalid/expired API key | Auto-retried by the script. If persistent, delete `~/.pangolin_api_key` and retry. |
 | 2001 | Insufficient credits | Top up credits at pangolinfo.com. |
 | 2007 | Account expired | Renew subscription at pangolinfo.com. |
 | 10000 | Task execution failed | Retry the request. Check query format. |

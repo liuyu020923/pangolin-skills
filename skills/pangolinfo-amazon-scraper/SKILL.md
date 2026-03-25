@@ -5,7 +5,7 @@ description: >
   wants to: look up Amazon products by ASIN, search Amazon by keyword, check
   bestsellers/new releases, get product reviews or pricing, compare products
   across Amazon regions, browse categories, or research sellers.
-  Requires PANGOLIN_EMAIL + PANGOLIN_PASSWORD env vars (or PANGOLIN_TOKEN).
+  Requires PANGOLIN_EMAIL + PANGOLIN_PASSWORD env vars (or PANGOLIN_API_KEY).
 ---
 
 # Pangolinfo Amazon Scraper
@@ -37,7 +37,7 @@ Activate this skill when the user's intent matches any of these patterns:
 - **Python 3.8+** (uses only the standard library -- zero external dependencies)
 - **Pangolin account** at [pangolinfo.com](https://www.pangolinfo.com)
 - **Environment variables** (one of the following):
-  - `PANGOLIN_TOKEN` -- API key (skips login), OR
+  - `PANGOLIN_API_KEY` -- API key (skips login), OR
   - `PANGOLIN_EMAIL` + `PANGOLIN_PASSWORD` -- auto-login with caching
 
 ### macOS SSL Certificate Fix
@@ -84,13 +84,13 @@ Tell the user (in their language):
 
 ### Step 3: Collect credentials and authenticate automatically
 
-When the user provides their credentials, **you (the AI agent) should configure them securely**. The script will automatically cache the API key at `~/.pangolin_token` for all future calls.
+When the user provides their credentials, **you (the AI agent) should configure them securely**. The script will automatically cache the API key at `~/.pangolin_api_key` for all future calls.
 
 **If user provides an API key (recommended):**
 Write it directly to the cache file — avoids shell history entirely:
 ```bash
-echo "<token>" > ~/.pangolin_token
-chmod 600 ~/.pangolin_token 2>/dev/null
+echo "<api_key>" > ~/.pangolin_api_key
+chmod 600 ~/.pangolin_api_key 2>/dev/null
 python3 scripts/pangolin.py --auth-only
 ```
 
@@ -105,7 +105,7 @@ unset PANGOLIN_EMAIL PANGOLIN_PASSWORD
 
 This avoids passwords appearing in shell history (unlike inline `VAR=x command` syntax) and cleans up credentials after the API key is cached.
 
-Both methods cache the API key automatically. After this one-time setup, **no environment variables are needed** — all future calls will use the cached API key at `~/.pangolin_token`.
+Both methods cache the API key automatically. After this one-time setup, **no environment variables are needed** — all future calls will use the cached API key at `~/.pangolin_api_key`.
 
 ### Step 4: Confirm and proceed
 
@@ -115,11 +115,11 @@ After auth returns `"success": true`:
 
 ### Important
 
-- **The user only needs to provide credentials ONCE** — the script caches the API key permanently at `~/.pangolin_token`
+- **The user only needs to provide credentials ONCE** — the script caches the API key permanently at `~/.pangolin_api_key`
 - Do not ask the user to manually edit `.bashrc` or `.zshrc` — the script handles persistence automatically
 - If the user doesn't have an account yet, explain Pangolin's credit system (1 credit per Amazon json request, 5 credits per review page) and direct them to [pangolinfo.com](https://www.pangolinfo.com)
 - If auth succeeds but credits are exhausted (error code `2001`), tell the user to top up at pangolinfo.com
-- API key is permanent and does not expire unless the account is deactivated
+- The API key is permanent and does not expire unless the account is deactivated
 
 ## Script Execution
 
@@ -461,7 +461,7 @@ Credits are only consumed on successful requests (API code 0). Average response 
 
 | Error Code | Meaning | User-Friendly Message | Resolution |
 |---|---|---|---|
-| `MISSING_ENV` | No credentials set | "I need your Pangolin credentials to access Amazon data." | Set `PANGOLIN_EMAIL` + `PANGOLIN_PASSWORD` or `PANGOLIN_TOKEN` |
+| `MISSING_ENV` | No credentials set | "I need your Pangolin credentials to access Amazon data." | Set `PANGOLIN_EMAIL` + `PANGOLIN_PASSWORD` or `PANGOLIN_API_KEY` |
 | `AUTH_FAILED` | Bad email/password | "Authentication failed. Please check your Pangolin credentials." | Verify email and password |
 | `RATE_LIMIT` | Too many requests | "The API is rate-limiting us. Let me wait and retry." | Wait and retry |
 | `NETWORK` | Connection failed | "I couldn't reach the API. Please check your connection." | Check internet, retry |
